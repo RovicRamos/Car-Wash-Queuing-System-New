@@ -1,0 +1,20 @@
+<?php
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Unset all session variables
+$_SESSION = array();
+
+// Destroy the session
+session_destroy();
+
+// Send a success response
+header('Content-Type: application/json');
+http_response_code(200);
+echo json_encode([
+    'status' => 'success',
+    'message' => 'Logged out successfully.'
+]);
+exit;
+?>

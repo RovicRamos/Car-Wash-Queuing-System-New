@@ -1,0 +1,82 @@
+-- Create this database in phpMyAdmin, e.g., 'rovics_car_wash'
+-- Then, import this file into that database.
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `users`
+--
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `role` enum('customer','admin') NOT NULL DEFAULT 'customer',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Add a default admin user (password is "admin123")
+-- You SHOULD change this password immediately.
+--
+INSERT INTO `users` (`name`, `email`, `password_hash`, `role`, `created_at`) VALUES
+('Admin User', 'admin@rovics.com', '$2y$10$7R.E.N.V.Q.M/fg.m1C7YuO7m9L8z.61U/zG2.SOwG.1.S3BwG', 'admin', '2025-10-28 12:00:00');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `services`
+--
+CREATE TABLE `services` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `description` text DEFAULT NULL,
+  `price` decimal(10,2) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Add some default services
+--
+INSERT INTO `services` (`name`, `description`, `price`) VALUES
+('Basic Wash', 'Exterior wash and dry.', 350.00),
+('Premium Wash', 'Basic wash plus interior vacuum and tire shine.', 600.00),
+('Interior Detailing', 'Deep clean of all interior surfaces, seats, and carpets.', 1500.00);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `bookings`
+--
+CREATE TABLE `bookings` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `service_id` int(11) NOT NULL,
+  `service_name` varchar(255) NOT NULL,
+  `service_price` decimal(10,2) NOT NULL,
+  `notes` text DEFAULT NULL,
+  `status` enum('pending','in_progress','completed','cancelled') NOT NULL DEFAULT 'pending',
+  `staff_assigned` varchar(255) DEFAULT 'Unassigned',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `started_at` timestamp NULL DEFAULT NULL,
+  `completed_at` timestamp NULL DEFAULT NULL,
+  `cancelled_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `service_id` (`service_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Add constraints
+--
+ALTER TABLE `bookings`
+  ADD CONSTRAINT `bookings_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `bookings_ibfk_2` FOREIGN KEY (`service_id`) REFERENCES `services` (`id`) ON DELETE RESTRICT;
+
+COMMIT;

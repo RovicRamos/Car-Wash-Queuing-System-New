@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rovic's Car Wash</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .tab-button { @apply px-4 py-2 font-medium text-white rounded-t-lg transition-colors duration-200; }
+        .tab-button.active { @apply text-blue-400 bg-gray-800 border-b-2 border-blue-400; }
+        .tab-content { @apply hidden p-4 bg-gray-800 rounded-b-lg shadow; }
+        .tab-content.active { @apply block; }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1); width: 36px; height: 36px; border-radius: 50%;
+            border-left-color: #09f; animation: spin 1s ease infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- PRINT STYLES --- */
+        @media print {
+            body * { visibility: hidden; }
+            #admin-reports-tab, #admin-reports-tab * { visibility: visible; }
+            #admin-reports-tab { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background-color: white !important; color: black !important; }
+            button { display: none !important; }
+            .bg-gray-700, .bg-gray-800, .bg-gray-900 { background-color: white !important; border: 1px solid #ccc; box-shadow: none !important; }
+            .text-gray-100, .text-gray-200, .text-gray-300, .text-gray-400, .text-blue-400, .text-green-500, .text-blue-500 { color: black !important; }
+            table, th, td { border: 1px solid black !important; border-collapse: collapse; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900">
+
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden"><div class="spinner"></div></div>
+    
+    <div id="alert-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="alert-title" class="text-lg font-medium text-gray-900">Notification</h3>
+                <button id="alert-close-btn" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <p id="alert-message" class="text-gray-700"></p>
+            <button id="alert-ok-btn" class="mt-6 w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">OK</button>
+        </div>
+    </div>
+
+    <div id="verify-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-8 max-w-sm w-full border border-gray-700 text-center">
+            <div class="bg-blue-900 p-3 rounded-full inline-block mb-4"><i data-lucide="mail" class="w-8 h-8 text-blue-400"></i></div>
+            <h2 class="text-2xl font-bold text-white mb-2">Verify Email</h2>
+            <p class="text-gray-400 text-sm mb-6">We sent a 6-digit code to <span id="verify-email-display" class="text-white font-medium"></span></p>
+            
+            <form id="verify-form">
+                <input type="hidden" id="verify-email-hidden">
+                <div class="mb-6">
+                    <input type="text" id="verify-code" placeholder="Enter Code" maxlength="6" class="w-full text-center tracking-widest text-2xl px-4 py-3 border-gray-600 bg-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase" required>
+                </div>
+                <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-colors">Verify & Login</button>
+            </form>
+            <button onclick="document.getElementById('verify-modal').classList.add('hidden')" class="mt-4 text-gray-500 hover:text-gray-300 text-sm">Cancel</button>
+        </div>
+    </div>
+
+    <div id="history-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl border border-gray-700 flex flex-col max-h-[80vh]">
+            <div class="flex justify-between items-center p-6 border-b border-gray-700">
+                <h3 class="text-xl font-bold text-white">Customer History: <span id="history-user-name" class="text-blue-400"></span></h3>
+                <button onclick="document.getElementById('history-modal').classList.add('hidden')" class="text-gray-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1">
+                <div id="history-modal-content" class="space-y-4"></div>
+            </div>
+            <div class="p-4 border-t border-gray-700 text-right">
+                <button onclick="document.getElementById('history-modal').classList.add('hidden')" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-500">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="auth-container" class="relative min-h-screen flex items-center justify-center bg-cover bg-center" style="background-image: url('background.png');">
+        <div class="absolute inset-0 bg-black opacity-50"></div>
+        <div class="relative max-w-md w-full p-6 z-10">
+            <div id="login-page">
+                <div class="bg-gray-800 bg-opacity-95 p-8 rounded-lg shadow-xl text-center backdrop-blur-sm">
+                    <div class="flex justify-center mb-4"><img src="logo.png" onerror="this.src='https://cdn-icons-png.flaticon.com/512/2962/2962303.png'" alt="Logo" class="h-45 w-45 object-contain"></div>
+                    <h1 class="text-3xl font-bold text-blue-400 mb-2">Rovic's Car Wash</h1>
+                    <p class="text-gray-300 mb-6">Welcome back! Please sign in.</p>
+                    <form id="login-form">
+                        <div class="mb-4"><input type="email" id="login-email" placeholder="Email" class="w-full px-4 py-2 border-gray-600 bg-gray-700 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" required></div>
+                        <div class="mb-6 relative"><input type="password" id="login-password" placeholder="Password" class="w-full px-4 py-2 border-gray-600 bg-gray-700 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10" required><button type="button" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-200 focus:outline-none toggle-password-btn" data-target="login-password"><i data-lucide="eye" class="w-5 h-5"></i></button></div>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">Sign In</button>
+                    </form>
+                    <p class="mt-6 text-sm text-gray-300">Don't have an account? <button id="show-signup-btn" class="text-blue-400 hover:underline font-medium">Sign Up</button></p>
+                </div>
+            </div>
+            <div id="signup-page" class="hidden">
+                <div class="bg-gray-800 bg-opacity-95 p-8 rounded-lg shadow-xl text-center backdrop-blur-sm">
+                    <div class="flex justify-center mb-4"><img src="logo.png" onerror="this.src='https://cdn-icons-png.flaticon.com/512/2962/2962303.png'" alt="Logo" class="h-45 w-45 object-contain"></div>
+                    <h1 class="text-3xl font-bold text-blue-400 mb-2">Create Account</h1>
+                    <p class="text-gray-300 mb-6">Join Rovic's Car Wash today!</p>
+                    <form id="signup-form">
+                        <div class="mb-4"><input type="text" id="signup-name" placeholder="Full Name" class="w-full px-4 py-2 border-gray-600 bg-gray-700 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" required></div>
+                        <div class="mb-4"><input type="email" id="signup-email" placeholder="Email" class="w-full px-4 py-2 border-gray-600 bg-gray-700 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" required></div>
+                        <div class="mb-6 relative"><input type="password" id="signup-password" placeholder="Password (min. 6 characters)" class="w-full px-4 py-2 border-gray-600 bg-gray-700 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10" required><button type="button" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-200 focus:outline-none toggle-password-btn" data-target="signup-password"><i data-lucide="eye" class="w-5 h-5"></i></button></div>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">Sign Up</button>
+                    </form>
+                    <p class="mt-6 text-sm text-gray-300">Already have an account? <button id="show-login-btn" class="text-blue-400 hover:underline font-medium">Sign In</button></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-container" class="hidden">
+        <header class="bg-gray-800 shadow-md">
+            <nav class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <img src="logo.png" onerror="this.src='https://cdn-icons-png.flaticon.com/512/2962/2962303.png'" alt="Logo" class="h-10 w-10 object-contain">
+                    <span class="text-2xl font-bold text-blue-400">Rovic's Car Wash</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="user-email-display" class="text-gray-300 text-sm hidden sm:block"></span>
+                    <span id="user-role-display" class="px-3 py-1 text-xs font-medium rounded-full bg-blue-900 text-blue-200"></span>
+                    
+                    <div class="relative">
+                        <button id="notif-btn" class="text-gray-300 hover:text-white focus:outline-none">
+                            <i data-lucide="bell" class="w-6 h-6"></i>
+                            <span id="notif-badge" class="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-red-100 transform translate-x-1/4 -translate-y-1/4 bg-red-600 rounded-full hidden">0</span>
+                        </button>
+                        <div id="notif-dropdown" class="absolute right-0 mt-2 w-72 bg-gray-800 rounded-md shadow-lg overflow-hidden z-20 hidden border border-gray-700">
+                            <div class="py-2">
+                                <div id="notif-list" class="max-h-64 overflow-y-auto"><p class="px-4 py-2 text-sm text-gray-400">No notifications.</p></div>
+                                <button id="mark-read-btn" class="block w-full text-center px-4 py-2 text-sm text-blue-400 hover:bg-gray-700 border-t border-gray-700">Mark all read</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button id="logout-btn" class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition-colors">Logout</button>
+                </div>
+            </nav>
+        </header>
+
+        <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div id="customer-view" class="hidden">
+                <div class="bg-gray-700 rounded-lg">
+                    <nav class="flex border-b border-gray-600">
+                        <button class="tab-button active" data-tab="book-service-tab">Book a Service</button>
+                        <button class="tab-button" data-tab="queue-display-tab">Live Queue</button>
+                        <button class="tab-button" data-tab="booking-history-tab">My History</button>
+                    </nav>
+                </div>
+                <div id="book-service-tab" class="tab-content active">
+                    <h2 class="text-2xl font-semibold mb-4 text-gray-100">Our Services</h2>
+                    <form id="booking-form">
+                        <div id="service-selection-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6"></div>
+                        <div class="mb-4"><label for="booking-notes" class="block text-sm font-medium text-gray-300 mb-1">Notes (optional)</label><textarea id="booking-notes" rows="3" class="w-full max-w-lg px-4 py-2 border-gray-600 bg-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., 'White Toyota Fortuner, Plate ABC 123'"></textarea></div>
+                        <button type="submit" class="bg-green-600 text-white py-2 px-6 rounded-lg hover:bg-green-700 transition-colors">Book Now</button>
+                    </form>
+                </div>
+                <div id="queue-display-tab" class="tab-content"><h2 class="text-2xl font-semibold mb-4 text-gray-100">Live Queue</h2><div id="queue-list-container" class="space-y-4"></div></div>
+                <div id="booking-history-tab" class="tab-content"><h2 class="text-2xl font-semibold mb-4 text-gray-100">My Booking History</h2><div id="history-list-container" class="space-y-4"></div></div>
+            </div>
+
+            <div id="admin-view" class="hidden">
+                <div class="bg-gray-700 rounded-lg">
+                    <nav class="flex flex-wrap border-b border-gray-600">
+                        <button class="tab-button active" data-tab="admin-dashboard-tab">Dashboard</button>
+                        <button class="tab-button" data-tab="admin-queue-mgmt-tab">Queue Management</button>
+                        <button class="tab-button" id="nav-services" data-tab="admin-services-mgmt-tab">Service Management</button>
+                        <button class="tab-button" id="nav-users" data-tab="admin-users-mgmt-tab">User Management</button>
+                        <button class="tab-button" id="nav-reports" data-tab="admin-reports-tab">Detailed Reports</button>
+                    </nav>
+                </div>
+
+                <div id="admin-dashboard-tab" class="tab-content active">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-semibold text-gray-100">Dashboard</h2>
+                        <button id="reset-stats-btn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2"><i data-lucide="rotate-ccw" class="w-4 h-4"></i><span>Start New Day (Reset Stats)</span></button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                        <div class="relative bg-gradient-to-br from-yellow-100 to-yellow-200 p-6 rounded-lg shadow-lg overflow-hidden"><i data-lucide="clock" class="absolute -right-4 -bottom-4 h-24 w-24 text-yellow-400 opacity-50"></i><h3 class="text-yellow-800 font-medium">Pending</h3><p id="stats-pending" class="text-3xl font-bold text-yellow-700">0</p></div>
+                        <div class="relative bg-gradient-to-br from-blue-100 to-blue-200 p-6 rounded-lg shadow-lg overflow-hidden"><i data-lucide="spray-can" class="absolute -right-4 -bottom-4 h-24 w-24 text-blue-400 opacity-50"></i><h3 class="text-blue-800 font-medium">In-Progress</h3><p id="stats-in-progress" class="text-3xl font-bold text-blue-700">0</p></div>
+                        <div class="relative bg-gradient-to-br from-green-100 to-green-200 p-6 rounded-lg shadow-lg overflow-hidden"><i data-lucide="check-check" class="absolute -right-4 -bottom-4 h-24 w-24 text-green-400 opacity-50"></i><h3 class="text-green-800 font-medium">Completed Today</h3><p id="stats-completed-today" class="text-3xl font-bold text-green-700">0</p></div>
+                        <div id="card-revenue" class="relative bg-gradient-to-br from-purple-100 to-purple-200 p-6 rounded-lg shadow-lg overflow-hidden"><i data-lucide="banknote" class="absolute -right-4 -bottom-4 h-24 w-24 text-purple-400 opacity-50"></i><h3 class="text-purple-800 font-medium">Revenue</h3><p id="stats-revenue-today" class="text-3xl font-bold text-purple-700">₱0.00</p></div>
+                    </div>
+                    <div class="bg-gray-700 rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold text-gray-100 mb-4">Recent Activity (Last 5 Completed)</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-600"><thead class="bg-gray-600"><tr><th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">Service</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">Price</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">Staff</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase">Time</th></tr></thead><tbody id="dashboard-activity-log" class="divide-y divide-gray-600"><tr><td colspan="4" class="px-4 py-4 text-gray-400">No recent activity.</td></tr></tbody></table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="admin-queue-mgmt-tab" class="tab-content"><h2 class="text-2xl font-semibold mb-4 text-gray-100">Queue Management</h2><div id="admin-queue-list-container" class="space-y-4"></div></div>
+
+                <div id="admin-services-mgmt-tab" class="tab-content">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div class="lg:col-span-1">
+                            <h2 class="text-2xl font-semibold mb-4 text-gray-100" id="service-form-title">Add New Service</h2>
+                            <form id="service-form" class="bg-gray-700 p-6 rounded-lg shadow-md space-y-4">
+                                <input type="hidden" id="service-id" name="id">
+                                <div><label class="block text-sm font-medium text-gray-300">Service Name</label><input type="text" id="service-name" name="name" class="mt-1 w-full px-4 py-2 border-gray-500 bg-gray-600 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500" required></div>
+                                <div><label class="block text-sm font-medium text-gray-300">Price (PHP)</label><input type="number" id="service-price" name="price" min="0" step="0.01" class="mt-1 w-full px-4 py-2 border-gray-500 bg-gray-600 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500" required></div>
+                                <div><label class="block text-sm font-medium text-gray-300">Service Image</label><input type="file" id="service-image" name="image" accept="image/*" class="mt-1 w-full text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"><p class="text-xs text-gray-400 mt-1">Leave empty to keep current (if editing).</p></div>
+                                <div><label class="block text-sm font-medium text-gray-300">Description</label><textarea id="service-description" name="description" rows="3" class="mt-1 w-full px-4 py-2 border-gray-500 bg-gray-600 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea></div>
+                                <div class="flex space-x-2"><button type="submit" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">Save Service</button><button type="button" id="service-form-cancel" class="flex-1 bg-gray-500 text-gray-100 py-2 px-4 rounded-lg hover:bg-gray-600 transition-colors hidden">Cancel</button></div>
+                            </form>
+                        </div>
+                        <div class="lg:col-span-2"><h2 class="text-2xl font-semibold mb-4 text-gray-100">Current Services</h2><div id="service-list-container" class="space-y-3"></div></div>
+                    </div>
+                </div>
+
+                <div id="admin-users-mgmt-tab" class="tab-content">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div class="lg:col-span-1">
+                            <h2 class="text-2xl font-semibold mb-4 text-gray-100">Add New User</h2>
+                            <form id="user-mgmt-form" class="bg-gray-700 p-6 rounded-lg shadow-md space-y-4">
+                                <div><label class="block text-sm font-medium text-gray-300">Full Name</label><input type="text" id="mgmt-user-name" class="mt-1 w-full px-4 py-2 bg-gray-600 text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500" required></div>
+                                <div><label class="block text-sm font-medium text-gray-300">Email</label><input type="email" id="mgmt-user-email" class="mt-1 w-full px-4 py-2 bg-gray-600 text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500" required></div>
+                                <div><label class="block text-sm font-medium text-gray-300">Password</label><input type="password" id="mgmt-user-pass" class="mt-1 w-full px-4 py-2 bg-gray-600 text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500" required></div>
+                                <div><label class="block text-sm font-medium text-gray-300">Role</label><select id="mgmt-user-role" class="mt-1 w-full px-4 py-2 bg-gray-600 text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="customer">Customer</option><option value="admin">Admin</option><option value="staff">Staff</option></select></div>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors">Create User</button>
+                            </form>
+                        </div>
+                        <div class="lg:col-span-2"><h2 class="text-2xl font-semibold mb-4 text-gray-100">Registered Users</h2><table class="min-w-full divide-y divide-gray-600 bg-gray-700 rounded-lg"><tbody id="user-mgmt-table-body" class="divide-y divide-gray-600"></tbody></table></div>
+                    </div>
+                </div>
+
+                <div id="admin-reports-tab" class="tab-content">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-semibold text-gray-100">Detailed Reports</h2>
+                        <button id="print-reports-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2">
+                            <i data-lucide="printer" class="w-4 h-4"></i>
+                            <span>Print Report</span>
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-6 mb-8">
+                        <div class="bg-gray-700 p-6 rounded shadow"><h3 class="text-gray-400">Total Revenue (Current Day)</h3><p id="report-total-revenue" class="text-4xl font-bold text-green-500">₱0.00</p></div>
+                        <div class="bg-gray-700 p-6 rounded shadow"><h3 class="text-gray-400">Total Washes (Current Day)</h3><p id="report-total-washes" class="text-4xl font-bold text-blue-500">0</p></div>
+                    </div>
+                    <div class="bg-gray-700 p-4 rounded shadow mb-4 overflow-x-auto"><h3 class="text-lg font-medium text-gray-200 mb-2">Staff Performance</h3><table class="min-w-full divide-y divide-gray-600"><thead class="bg-gray-600"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Staff Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Washes Completed</th></tr></thead><tbody id="staff-performance-table-body" class="divide-y divide-gray-600"></tbody></table></div>
+                    <div class="bg-gray-700 p-4 rounded shadow overflow-x-auto"><h3 class="text-lg font-medium text-gray-200 mb-2">Completed Bookings Log</h3><table class="min-w-full divide-y divide-gray-600"><thead class="bg-gray-600"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Time</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Service</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Price</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Staff</th></tr></thead><tbody id="completed-bookings-table-body" class="divide-y divide-gray-600"></tbody></table></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        const API_BASE_URL = 'api/';
+        let currentUserId=null, currentUserRole=null, currentUserEmail=null;
+        let queuePollInterval=null, adminQueuePollInterval=null, notifPollInterval=null;
+
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const alertModal = document.getElementById('alert-modal');
+        const verifyModal = document.getElementById('verify-modal');
+        const alertTitle = document.getElementById('alert-title');
+        const alertMessage = document.getElementById('alert-message');
+        const alertCloseBtn = document.getElementById('alert-close-btn');
+        const alertOkBtn = document.getElementById('alert-ok-btn');
+        const authContainer = document.getElementById('auth-container');
+        const appContainer = document.getElementById('app-container');
+        const loginPage = document.getElementById('login-page');
+        const signupPage = document.getElementById('signup-page');
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        const customerView = document.getElementById('customer-view');
+        const adminView = document.getElementById('admin-view');
+
+        const showLoading = s => loadingOverlay.classList.toggle('hidden', !s);
+        const showAlert = (m,t='Notification') => { alertTitle.textContent=t; alertMessage.textContent=m; alertModal.classList.remove('hidden'); };
+        const hideAlert = () => alertModal.classList.add('hidden');
+        alertCloseBtn.onclick = hideAlert; alertOkBtn.onclick = hideAlert;
+        const formatCurrency = a => new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(parseFloat(a) || 0);
+        const formatTimestamp = t => t ? new Date(t).toLocaleString() : 'N/A';
+
+        document.querySelectorAll('.toggle-password-btn').forEach(b=>{
+            b.addEventListener('click',()=>{
+                const i = document.getElementById(b.dataset.target);
+                i.type = i.type==='password'?'text':'password';
+                i.classList.toggle('text-blue-300');
+            });
+        });
+
+        const apiRequest = async (ep, m='GET', b=null, fd=false) => {
+            const opts = {method:m, headers:{}};
+            if(!fd) opts.headers['Content-Type']='application/json';
+            if(b) opts.body = fd ? b : JSON.stringify(b);
+            try {
+                const r = await fetch(API_BASE_URL+ep, opts);
+                const t = await r.text();
+                if(!r.ok) throw new Error((t?JSON.parse(t):{}).message || r.statusText);
+                return t ? JSON.parse(t) : {status:'success',data:{}};
+            } catch(e) { throw e; }
+        };
+
+        const checkSession = async () => {
+            showLoading(true);
+            try {
+                const r = await apiRequest('check_session.php');
+                if(r.data.loggedIn) setupApp(r.data.user); else { authContainer.classList.remove('hidden'); loginPage.classList.remove('hidden'); }
+            } catch(e) { authContainer.classList.remove('hidden'); loginPage.classList.remove('hidden'); }
+            showLoading(false);
+        };
+
+        const setupApp = u => {
+            currentUserId=u.id; currentUserRole=u.role; currentUserEmail=u.email;
+            document.getElementById('user-email-display').textContent=u.email;
+            document.getElementById('user-role-display').textContent=u.role;
+            authContainer.classList.add('hidden'); appContainer.classList.remove('hidden');
+            
+            if(u.role==='customer') {
+                customerView.classList.remove('hidden'); adminView.classList.add('hidden');
+                loadServicesForBooking(); loadQueue(); loadBookingHistory();
+                queuePollInterval = setInterval(loadQueue, 5000);
+            } else {
+                adminView.classList.remove('hidden'); customerView.classList.add('hidden');
+                const isStaff = u.role === 'staff';
+                document.getElementById('nav-services').classList.toggle('hidden', isStaff);
+                document.getElementById('nav-users').classList.toggle('hidden', isStaff);
+                document.getElementById('nav-reports').classList.toggle('hidden', isStaff);
+                document.getElementById('card-revenue').classList.toggle('hidden', isStaff);
+                document.getElementById('reset-stats-btn').classList.toggle('hidden', isStaff);
+                loadAdminDashboard(); loadAdminQueue();
+                if(!isStaff) { loadServicesMgmt(); loadUsersMgmt(); loadAdminReports(); } 
+                adminQueuePollInterval = setInterval(loadAdminQueue, 5000);
+            }
+            checkNotifications();
+            notifPollInterval = setInterval(checkNotifications, 10000);
+            setupTabs();
+        };
+
+        const checkNotifications = async () => {
+            try {
+                const res = await apiRequest('notifications.php');
+                const badge = document.getElementById('notif-badge');
+                const list = document.getElementById('notif-list');
+                if(res.data.unread_count > 0) { badge.textContent = res.data.unread_count; badge.classList.remove('hidden'); } 
+                else { badge.classList.add('hidden'); }
+                if(res.data.notifications.length > 0) {
+                    list.innerHTML = res.data.notifications.map(n => `<div class="px-4 py-3 border-b border-gray-700 ${n.is_read?'opacity-50':'bg-gray-700'}"><p class="text-sm text-gray-200">${n.message}</p><span class="text-xs text-gray-400">${formatTimestamp(n.created_at)}</span></div>`).join('');
+                } else { list.innerHTML = '<p class="px-4 py-2 text-sm text-gray-400">No notifications.</p>'; }
+            } catch(e) {}
+        };
+        document.getElementById('notif-btn').onclick = () => document.getElementById('notif-dropdown').classList.toggle('hidden');
+        document.getElementById('mark-read-btn').onclick = async () => { await apiRequest('notifications.php', 'POST'); checkNotifications(); };
+
+        loginForm.onsubmit = async e => { e.preventDefault(); try{ const r = await apiRequest('login.php','POST',{email:document.getElementById('login-email').value,password:document.getElementById('login-password').value}); setupApp(r.data.user); }catch(err){showAlert(err.message,"Login Failed");} };
+        
+        // --- NEW: MODIFIED SIGNUP TO HANDLE VERIFICATION ---
+        signupForm.onsubmit = async e => { 
+            e.preventDefault(); 
+            const email = document.getElementById('signup-email').value;
+            showLoading(true);
+            try{ 
+                const r = await apiRequest('signup.php','POST',{name:document.getElementById('signup-name').value,email:email,password:document.getElementById('signup-password').value}); 
+                
+                // If verification is required, show modal instead of logging in
+                if(r.data.require_verification) {
+                    document.getElementById('signup-page').classList.add('hidden');
+                    // We keep auth-container visible for background
+                    document.getElementById('verify-email-display').textContent = email;
+                    document.getElementById('verify-email-hidden').value = email;
+                    verifyModal.classList.remove('hidden');
+                    
+                    // Show debug code in console if email fails
+                    if(r.data.debug_code) console.log("TEST CODE:", r.data.debug_code); 
+                    showAlert(`We sent a verification code to ${email}.`, "Verify Email");
+                } else {
+                    setupApp(r.data.user); 
+                }
+            } catch(err) {
+                showAlert(err.message,"Signup Failed");
+            }
+            showLoading(false);
+        };
+
+        // --- NEW: VERIFICATION FORM HANDLER ---
+        document.getElementById('verify-form').onsubmit = async e => {
+            e.preventDefault();
+            showLoading(true);
+            try {
+                const r = await apiRequest('verify.php', 'POST', {
+                    email: document.getElementById('verify-email-hidden').value,
+                    code: document.getElementById('verify-code').value
+                });
+                verifyModal.classList.add('hidden');
+                showAlert("Account Verified! Logging you in...", "Success");
+                
+                // Small delay to let user read the success message
+                setTimeout(() => {
+                    hideAlert();
+                    setupApp(r.data.user);
+                }, 1500);
+            } catch(err) {
+                showAlert(err.message, "Verification Failed");
+            }
+            showLoading(false);
+        };
+
+        document.getElementById('logout-btn').onclick = async () => { await apiRequest('logout.php','POST'); location.reload(); };
+        document.getElementById('show-signup-btn').onclick = () => { loginPage.classList.add('hidden'); signupPage.classList.remove('hidden'); };
+        document.getElementById('show-login-btn').onclick = () => { signupPage.classList.add('hidden'); loginPage.classList.remove('hidden'); };
+
+        const setupTabs = () => {
+            document.querySelectorAll('.tab-button').forEach(b => {
+                b.addEventListener('click', () => {
+                    const c = b.closest('#customer-view') || b.closest('#admin-view');
+                    c.querySelectorAll('.tab-button').forEach(bt=>bt.classList.remove('active'));
+                    c.querySelectorAll('.tab-content').forEach(tc=>tc.classList.remove('active'));
+                    b.classList.add('active');
+                    document.getElementById(b.dataset.tab).classList.add('active');
+                    if(b.dataset.tab==='admin-dashboard-tab') loadAdminDashboard();
+                    if(b.dataset.tab==='admin-users-mgmt-tab' && currentUserRole!=='staff') loadUsersMgmt();
+                    if(b.dataset.tab==='admin-reports-tab' && currentUserRole!=='staff') loadAdminReports();
+                    if(b.dataset.tab==='book-service-tab') loadServicesForBooking();
+                    if(b.dataset.tab==='queue-display-tab') loadQueue();
+                });
+            });
+        };
+
+        const loadAdminDashboard = async () => {
+            try {
+                const r = await apiRequest('reports.php?type=dashboard');
+                document.getElementById('stats-pending').textContent = r.data.pending||0;
+                document.getElementById('stats-in-progress').textContent = r.data.in_progress||0;
+                document.getElementById('stats-completed-today').textContent = r.data.completed_today||0;
+                document.getElementById('stats-revenue-today').textContent = formatCurrency(r.data.revenue_today||0);
+                const lb = document.getElementById('dashboard-activity-log');
+                if(Array.isArray(r.data.recent_activity) && r.data.recent_activity.length) {
+                    lb.innerHTML = r.data.recent_activity.map(i=>`<tr><td class="px-4 py-2 text-gray-200">${i.service_name}</td><td class="px-4 py-2 text-gray-400">${formatCurrency(i.service_price)}</td><td class="px-4 py-2 text-gray-300">${i.staff_assigned}</td><td class="px-4 py-2 text-gray-500 text-sm">${formatTimestamp(i.completed_at)}</td></tr>`).join('');
+                } else lb.innerHTML = '<tr><td colspan="4" class="px-4 py-4 text-gray-400">No recent activity.</td></tr>';
+            } catch(e) { console.error(e); }
+        };
+
+        document.getElementById('reset-stats-btn').onclick = () => {
+            showAlert("Are you sure? This resets 'Completed' and 'Revenue' for the current shift.", "Start New Day");
+            alertOkBtn.onclick = async () => {
+                hideAlert(); showLoading(true);
+                try { await apiRequest('reports.php','POST',{action:'reset'}); showAlert("New day started!","Success"); loadAdminDashboard(); loadAdminReports(); } catch(e) { showAlert(e.message,"Error"); }
+                showLoading(false); alertOkBtn.onclick=hideAlert;
+            };
+        };
+
+        // PRINT REPORT HANDLER
+        document.getElementById('print-reports-btn').onclick = () => {
+            window.print();
+        };
+
+        const loadAdminQueue = async () => {
+             if (document.activeElement?.tagName === 'INPUT' && document.activeElement.closest('#admin-queue-list-container')) return;
+             const l = document.getElementById('admin-queue-list-container');
+             try {
+                 const r = await apiRequest('queue.php');
+                 if(r.data.length===0) { l.innerHTML = '<p class="text-gray-400">No active bookings.</p>'; return; }
+                 l.innerHTML = r.data.map(b => `
+                    <div class="bg-gray-700 p-4 rounded shadow mb-2 flex flex-col sm:flex-row justify-between">
+                        <div class="mb-2 sm:mb-0">
+                             <span class="block font-bold text-gray-100 text-lg">${b.service_name}</span>
+                             <span class="block text-gray-400 text-sm">${b.user_email}</span>
+                             <span class="block text-gray-500 text-xs">${formatTimestamp(b.created_at)}</span>
+                             ${b.notes?`<span class="block text-gray-400 text-xs italic">"${b.notes}"</span>`:''}
+                        </div>
+                        <div class="flex items-start space-x-2">
+                            ${b.status==='pending' ? `<input type="text" id="staff-name-${b.id}" placeholder="Staff Name" class="px-2 py-1 bg-gray-600 rounded text-white text-sm border border-gray-500 outline-none focus:ring-2 focus:ring-blue-500"><button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm" onclick="updateStatus(${b.id},'in_progress')">Start</button><button class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm" onclick="updateStatus(${b.id},'cancelled')">Cancel</button>`:''}
+                            ${b.status==='in_progress' ? `<div class="text-right mr-4"><span class="text-xs text-gray-400 block">Staff</span><span class="text-sm text-gray-200 font-medium">${b.staff_assigned}</span></div><button class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm" onclick="updateStatus(${b.id},'completed')">Complete</button>`:''}
+                        </div>
+                    </div>`).join('');
+             } catch(e) { console.error(e); }
+        };
+
+        window.updateStatus = async (id, s) => {
+            let staff = null;
+            if(s==='in_progress') { staff = document.getElementById(`staff-name-${id}`).value; if(!staff) return showAlert("Enter staff name."); }
+            showLoading(true);
+            try { 
+                await apiRequest('bookings.php','PUT',{booking_id:id,status:s,staff_assigned:staff}); 
+                loadAdminQueue(); loadAdminDashboard(); 
+                if(currentUserRole==='admin') loadAdminReports(); 
+            } catch(e) { showAlert(e.message,"Error"); }
+            showLoading(false);
+        };
+
+        const loadServicesMgmt = async () => {
+            const c = document.getElementById('service-list-container');
+            try {
+                const r = await apiRequest('services.php');
+                if(r.data.length===0) { c.innerHTML='<p class="text-gray-400">No services.</p>'; return; }
+                c.innerHTML = r.data.map(s => `
+                    <div class="bg-gray-700 p-4 rounded-lg shadow flex justify-between items-center">
+                        <div class="flex items-center space-x-4">
+                            <img src="${s.image_path||`https://loremflickr.com/100/100/carwash?random=${s.id}`}" class="w-16 h-16 object-cover rounded-lg border border-gray-600">
+                            <div><span class="block font-bold text-gray-100">${s.name}</span><span class="text-sm text-gray-300">${s.description||''}</span><span class="block font-medium text-blue-400 mt-1">${formatCurrency(s.price)}</span></div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="text-blue-400 hover:text-blue-300 edit-svc-btn" data-id="${s.id}" data-name="${s.name}" data-price="${s.price}" data-desc="${s.description||''}"><i data-lucide="edit-2" class="w-5 h-5 pointer-events-none"></i></button>
+                            <button class="text-red-500 hover:text-red-400 del-svc-btn" data-id="${s.id}"><i data-lucide="trash-2" class="w-5 h-5 pointer-events-none"></i></button>
+                        </div>
+                    </div>`).join('');
+                lucide.createIcons();
+                document.querySelectorAll('.del-svc-btn').forEach(b=>{ b.onclick=()=>{ showAlert("Delete this service?","Confirm"); alertOkBtn.onclick=async()=>{ hideAlert(); showLoading(true); try{ await apiRequest('services.php','DELETE',{id:b.dataset.id}); loadServicesMgmt(); }catch(e){showAlert(e.message,"Error");} showLoading(false); alertOkBtn.onclick=hideAlert; }; }; });
+                document.querySelectorAll('.edit-svc-btn').forEach(b=>{ b.onclick=()=>{ document.getElementById('service-id').value=b.dataset.id; document.getElementById('service-name').value=b.dataset.name; document.getElementById('service-price').value=b.dataset.price; document.getElementById('service-description').value=b.dataset.desc; document.getElementById('service-form-title').textContent="Edit Service"; document.getElementById('service-form-cancel').classList.remove('hidden'); document.getElementById('service-name').focus(); }; });
+            } catch(e) { c.innerHTML='<p class="text-red-500">Error.</p>'; }
+        };
+
+        document.getElementById('service-form').onsubmit = async e => { e.preventDefault(); showLoading(true); try { await apiRequest('services.php','POST',new FormData(e.target),true); showAlert("Saved!","Success"); e.target.reset(); document.getElementById('service-id').value=''; document.getElementById('service-form-title').textContent="Add New Service"; document.getElementById('service-form-cancel').classList.add('hidden'); loadServicesMgmt(); } catch(err){showAlert(err.message,"Error");} showLoading(false); };
+        document.getElementById('service-form-cancel').onclick = () => { document.getElementById('service-form').reset(); document.getElementById('service-id').value=''; document.getElementById('service-form-title').textContent="Add New Service"; document.getElementById('service-form-cancel').classList.add('hidden'); };
+
+        const loadUsersMgmt = async () => {
+            const tb = document.getElementById('user-mgmt-table-body');
+            try {
+                const r = await apiRequest('users.php');
+                if(r.data.length===0) { tb.innerHTML='<tr><td colspan="4" class="px-6 py-4 text-gray-400">No users.</td></tr>'; return; }
+                tb.innerHTML = r.data.map(u => `<tr><td class="px-6 py-4 text-gray-100 font-medium">${u.name}</td><td class="px-6 py-4 text-gray-300">${u.email}</td><td class="px-6 py-4"><span class="px-2 py-1 rounded-full text-xs font-semibold ${u.role==='admin'?'bg-purple-900 text-purple-200':(u.role==='staff'?'bg-yellow-900 text-yellow-200':'bg-green-900 text-green-200')}">${u.role}</span></td><td class="px-6 py-4 text-right"><button class="text-blue-400 hover:text-blue-300 mr-2" onclick="viewHistory(${u.id},'${u.name}')">History</button><button class="text-red-400 hover:text-red-300" onclick="deleteUser(${u.id})">Delete</button></td></tr>`).join('');
+            } catch(e) { tb.innerHTML=`<tr><td colspan="4" class="text-red-500 p-4">${e.message}</td></tr>`; }
+        };
+
+        window.viewHistory = async (id, name) => {
+            document.getElementById('history-user-name').textContent = name;
+            const container = document.getElementById('history-modal-content');
+            container.innerHTML = '<p class="text-gray-400">Loading...</p>';
+            document.getElementById('history-modal').classList.remove('hidden');
+            try {
+                const res = await apiRequest(`bookings.php?user_id=${id}`);
+                if(res.data.length === 0) { container.innerHTML = '<p class="text-gray-400">No history found for this user.</p>'; return; }
+                container.innerHTML = res.data.map(b => `<div class="bg-gray-700 p-4 rounded-lg shadow border border-gray-600">
+                    <div class="flex justify-between items-center mb-1"><span class="font-bold text-white">${b.service_name}</span><span class="text-sm text-gray-400">${formatTimestamp(b.created_at)}</span></div>
+                    <div class="flex justify-between items-center"><span class="text-blue-400 font-medium">${formatCurrency(b.service_price)}</span><span class="px-2 py-0.5 rounded text-xs uppercase font-bold ${b.status==='completed'?'bg-green-900 text-green-200':(b.status==='cancelled'?'bg-red-900 text-red-200':'bg-yellow-900 text-yellow-200')}">${b.status}</span></div>
+                    ${b.staff_assigned ? `<div class="text-xs text-gray-500 mt-2">Staff: ${b.staff_assigned}</div>` : ''}
+                </div>`).join('');
+            } catch(e) { container.innerHTML = '<p class="text-red-500">Error loading history.</p>'; }
+        };
+
+        document.getElementById('user-mgmt-form').onsubmit = async e => { e.preventDefault(); showLoading(true); try { await apiRequest('users.php','POST',{name:document.getElementById('mgmt-user-name').value,email:document.getElementById('mgmt-user-email').value,password:document.getElementById('mgmt-user-pass').value,role:document.getElementById('mgmt-user-role').value}); showAlert("User created.","Success"); e.target.reset(); loadUsersMgmt(); } catch(e){showAlert(e.message,"Error");} showLoading(false); };
+        window.deleteUser = id => { showAlert("Delete user?","Confirm"); alertOkBtn.onclick=async()=>{ hideAlert(); showLoading(true); try{ await apiRequest('users.php','DELETE',{id}); loadUsersMgmt(); }catch(e){showAlert(e.message,"Error");} showLoading(false); alertOkBtn.onclick=hideAlert; }; };
+
+        const loadAdminReports = async () => {
+            try {
+                const r = await apiRequest('reports.php?type=full');
+                document.getElementById('report-total-revenue').textContent = formatCurrency(r.data.total_revenue_today||0);
+                document.getElementById('report-total-washes').textContent = r.data.total_washes_today||0;
+                const sb = document.getElementById('staff-performance-table-body');
+                if(Array.isArray(r.data.staff_performance) && r.data.staff_performance.length) {
+                    sb.innerHTML = r.data.staff_performance.map(s => `<tr><td class="px-6 py-4 text-gray-200">${s.staff_assigned}</td><td class="px-6 py-4 text-gray-400">${s.washes_completed}</td></tr>`).join('');
+                } else { sb.innerHTML = '<tr><td colspan="2" class="px-6 py-4 text-gray-500">No staff data yet.</td></tr>'; }
+                const bb = document.getElementById('completed-bookings-table-body');
+                if(Array.isArray(r.data.completed_bookings_today) && r.data.completed_bookings_today.length) {
+                    bb.innerHTML = r.data.completed_bookings_today.map(b => `<tr><td class="px-6 py-4 text-gray-400 text-sm">${formatTimestamp(b.completed_at)}</td><td class="px-6 py-4 text-gray-200">${b.service_name}</td><td class="px-6 py-4 text-gray-400">${formatCurrency(b.service_price)}</td><td class="px-6 py-4 text-gray-400">${b.staff_assigned}</td></tr>`).join('');
+                } else { bb.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-gray-500">No completed bookings yet.</td></tr>'; }
+            } catch(e) { console.error("Report Error:", e); }
+        };
+
+        const loadServicesForBooking = async () => {
+            const c = document.getElementById('service-selection-list');
+            try {
+                const r = await apiRequest('services.php');
+                if(r.data.length===0) { c.innerHTML='<p class="text-gray-400">No services.</p>'; return; }
+                c.innerHTML = r.data.map(s => `<label class="cursor-pointer bg-gray-700 rounded-lg shadow-lg overflow-hidden block relative has-[:checked]:ring-4 ring-blue-500 transition-all"><input type="radio" name="service" value="${s.id}" class="sr-only"><img class="h-40 w-full object-cover" src="${s.image_path||`https://loremflickr.com/400/300/carwash?random=${s.id}`}"><div class="p-4"><div class="flex justify-between items-center mb-2"><span class="font-bold text-gray-100 text-lg">${s.name}</span><span class="text-blue-400 font-bold">${formatCurrency(s.price)}</span></div><p class="text-sm text-gray-300">${s.description||''}</p></div></label>`).join('');
+            } catch(e) { c.innerHTML=`<p class="text-red-500">${e.message}</p>`; }
+        };
+
+        const loadQueue = async () => {
+             const l = document.getElementById('queue-list-container');
+             try {
+                const r = await apiRequest('queue.php');
+                if(r.data.length===0) { l.innerHTML = '<p class="text-gray-400">Queue is empty.</p>'; return; }
+                l.innerHTML = r.data.map((b,i) => `<div class="p-4 rounded-lg shadow flex justify-between items-center ${b.user_id==currentUserId?'bg-blue-900 border border-blue-700':'bg-gray-700'}"><div><span class="block font-bold ${b.user_id==currentUserId?'text-blue-300':'text-gray-100'} text-lg">Position #${i+1}</span><span class="text-gray-300">${b.service_name}</span>${b.user_id==currentUserId?'<span class="text-xs text-blue-300 ml-2">(You)</span>':''}</div><div class="text-right"><span class="font-bold ${b.status==='in_progress'?'text-blue-400':'text-yellow-400'} uppercase text-sm">${b.status.replace('_',' ')}</span><span class="block text-gray-500 text-xs">${formatTimestamp(b.created_at)}</span></div></div>`).join('');
+             } catch(e) { console.error(e); }
+        };
+
+        const loadBookingHistory = async () => {
+            const l = document.getElementById('history-list-container');
+            try {
+                const r = await apiRequest('bookings.php?user=me');
+                if(r.data.length===0) { l.innerHTML = '<p class="text-gray-400">No history.</p>'; return; }
+                l.innerHTML = r.data.map(b => `<div class="bg-gray-700 p-4 rounded-lg shadow flex justify-between"><div><span class="block font-bold text-gray-100">${b.service_name}</span><span class="text-xs text-gray-400">${formatTimestamp(b.created_at)}</span>${b.notes?`<p class="text-xs text-gray-300 italic">"${b.notes}"</p>`:''}</div><div class="text-right"><span class="block font-bold ${b.status==='completed'?'text-green-500':(b.status==='cancelled'?'text-red-500':(b.status==='in_progress'?'text-blue-400':'text-yellow-400'))} uppercase text-sm">${b.status.replace('_',' ')}</span><span class="text-gray-200 text-sm">${formatCurrency(b.service_price)}</span></div></div>`).join('');
+            } catch(e) { console.error(e); }
+        };
+
+        document.getElementById('booking-form').onsubmit = async e => { e.preventDefault(); const s = document.querySelector('input[name="service"]:checked'); if(!s) return showAlert("Select service."); showLoading(true); try{ await apiRequest('bookings.php','POST',{service_id:s.value,notes:document.getElementById('booking-notes').value}); showAlert("Booked!","Success"); e.target.reset(); document.querySelector('[data-tab="queue-display-tab"]').click(); }catch(err){showAlert(err.message,"Error");} showLoading(false); };
+
+        document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); checkSession(); });
+    </script>
+</body>
+</html>
