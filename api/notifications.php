@@ -1,5 +1,7 @@
 <?php
-include '../db_config.php';
+// api/notifications.php
+include 'db_config.php'; // <--- FIXED PATH (Was ../db_config.php)
+
 require_auth();
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -17,7 +19,8 @@ if ($method === 'GET') {
     $stmt_count = $conn->prepare("SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND is_read = 0");
     $stmt_count->bind_param("i", $user_id);
     $stmt_count->execute();
-    $unread = $stmt_count->get_result()->fetch_assoc()['c'];
+    $unread_row = $stmt_count->get_result()->fetch_assoc();
+    $unread = $unread_row['c'] ?? 0;
     
     send_success(['notifications' => $notifs, 'unread_count' => $unread]);
 
